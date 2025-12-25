@@ -40,3 +40,23 @@ if st.button("Compare faces 🔍"):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as f2:
             f2.write(img2_file.read())
             img2_path = f2.name
+
+        st.image(
+            [Image.open(img1_path), Image.open(img2_path)],
+            caption = ["Image 1", "Image 2"],
+            width=250
+        )
+        try:
+            similarity, is_same = app.compare(img1_path, img2_path, threshold)
+
+            st.markdown("---")
+            st.write(f"### 🔢 Similarity Score: `{similarity:.4f}`")
+
+            if is_same:
+                st.success("✅ SAME PERSON")
+            else:
+                st.error("❌ DIFFERENT PERSON")
+
+        except Exception as e:
+            st.error(str(e))
+
