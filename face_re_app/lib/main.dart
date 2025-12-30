@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 
 void main() {
   runApp(const FaceRecognitionApp());
@@ -88,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text("Compare Faces"),
             ),
           ],
+          
         ),
       ),
     );
