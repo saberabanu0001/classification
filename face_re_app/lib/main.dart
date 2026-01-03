@@ -35,72 +35,78 @@ class _HomeScreenState extends State<HomeScreen> {
   File? image1;
   File? image2;
 
-  Future<void> pickImage1() async {
-    // Show dialog to choose between gallery and camera
-    final ImageSource? source = await showDialog<ImageSource>(
+  Future<void> _showImageSourceDialog(Function(ImageSource) onSourceSelected) async {
+    await showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Image Source'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-          ],
-        ),
-      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onSourceSelected(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onSourceSelected(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
+  }
 
-    if (source != null) {
-      final XFile? picked = await _picker.pickImage(source: source);
-      if (picked != null) {
-        setState(() {
-          image1 = File(picked.path);
-        });
+  Future<void> pickImage1() async {
+    await _showImageSourceDialog((ImageSource source) async {
+      try {
+        final XFile? picked = await _picker.pickImage(
+          source: source,
+          imageQuality: 100,
+        );
+        if (picked != null) {
+          setState(() {
+            image1 = File(picked.path);
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error picking image: $e')),
+          );
+        }
       }
-    }
+    });
   }
 
   Future<void> pickImage2() async {
-    // Show dialog to choose between gallery and camera
-    final ImageSource? source = await showDialog<ImageSource>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Image Source'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (source != null) {
-      final XFile? picked = await _picker.pickImage(source: source);
-      if (picked != null) {
-        setState(() {
-          image2 = File(picked.path);
-        });
+    await _showImageSourceDialog((ImageSource source) async {
+      try {
+        final XFile? picked = await _picker.pickImage(
+          source: source,
+          imageQuality: 100,
+        );
+        if (picked != null) {
+          setState(() {
+            image2 = File(picked.path);
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error picking image: $e')),
+          );
+        }
       }
-    }
+    });
   }
 
   @override
