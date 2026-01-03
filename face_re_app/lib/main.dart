@@ -36,20 +36,70 @@ class _HomeScreenState extends State<HomeScreen> {
   File? image2;
 
   Future<void> pickImage1() async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        image1 = File(picked.path);
-      });
+    // Show dialog to choose between gallery and camera
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Image Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      final XFile? picked = await _picker.pickImage(source: source);
+      if (picked != null) {
+        setState(() {
+          image1 = File(picked.path);
+        });
+      }
     }
   }
 
   Future<void> pickImage2() async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        image2 = File(picked.path);
-      });
+    // Show dialog to choose between gallery and camera
+    final ImageSource? source = await showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Image Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      final XFile? picked = await _picker.pickImage(source: source);
+      if (picked != null) {
+        setState(() {
+          image2 = File(picked.path);
+        });
+      }
     }
   }
 
