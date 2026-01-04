@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -119,12 +120,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> compareFaces() async {
+    print('Compare faces button clicked');
+    
     if (image1 == null || image2 == null) {
+      print('Images are null: image1=$image1, image2=$image2');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select both images first')),
       );
       return;
     }
+
+    print('Starting face comparison...');
+    print('Image1 path: ${image1!.path}');
+    print('Image2 path: ${image2!.path}');
+    print('Backend URL: $backendUrl/compare');
 
     setState(() {
       _isComparing = true;
@@ -158,9 +167,17 @@ class _HomeScreenState extends State<HomeScreen> {
       // Add threshold
       request.fields['threshold'] = '0.6';
 
-      // Send request
-      var streamedResponse = await request.send();
+      // Send request with timeout
+      print('Sending request to backend...');
+      var streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout. Is the backend running at $backendUrl?');
+        },
+      );
+      print('Response received, status: ${streamedResponse.statusCode}');
       var response = await http.Response.fromStream(streamedResponse);
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -215,12 +232,53 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         throw Exception('Server error: ${response.statusCode} - ${response.body}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Error in compareFaces: $e');
+      print('Stack trace: $stackTrace');
+      
+      String errorMessage = 'Error comparing faces';
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('Failed host lookup') ||
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('timeout')) {
+        errorMessage = 'Cannot connect to backend server.\n\n'
+            'Please start the backend server:\n'
+            '1. Open terminal in project root\n'
+            '2. Run: uvicorn backend.main:app --reload --host 0.0.0.0\n'
+            '3. Make sure it\'s running on port 8000';
+      } else {
+        errorMessage = 'Error: $e';
+      }
+      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error comparing faces: $e'),
-            duration: const Duration(seconds: 5),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: SingleChildScrollView(
+              child: Text(errorMessage),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+              if (e.toString().contains('SocketException') || 
+                  e.toString().contains('Failed host lookup') ||
+                  e.toString().contains('Connection refused'))
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Backend URL: http://10.0.2.2:8000'),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  },
+                  child: const Text('Show URL'),
+                ),
+            ],
           ),
         );
       }
@@ -267,8 +325,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
             ElevatedButton(
               onPressed: (image1 != null && image2 != null && !_isComparing)
-                  ? compareFaces
-                  : null,
+                  ? () {
+                      print('Button pressed - image1: ${image1 != null}, image2: ${image2 != null}, isComparing: $_isComparing');
+                      compareFaces();
+                    }
+                  : () {
+                      print('Button disabled - image1: ${image1 != null}, image2: ${image2 != null}, isComparing: $_isComparing');
+                      if (image1 == null || image2 == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select both images first'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
               child: _isComparing
                   ? const Row(
                       mainAxisSize: MainAxisSize.min,
