@@ -249,35 +249,82 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Stack trace: $stackTrace');
       
       String errorMessage = 'Error comparing faces';
-      if (e.toString().contains('SocketException') || 
-          e.toString().contains('Failed host lookup') ||
-          e.toString().contains('Connection refused') ||
-          e.toString().contains('timeout')) {
+      String errorTitle = 'Error';
+      IconData errorIcon = Icons.error;
+      
+      String errorStr = e.toString();
+      
+      // Handle connection errors
+      if (errorStr.contains('SocketException') || 
+          errorStr.contains('Failed host lookup') ||
+          errorStr.contains('Connection refused') ||
+          errorStr.contains('timeout')) {
+        errorTitle = 'Connection Error';
         errorMessage = 'Cannot connect to backend server.\n\n'
             'Please start the backend server:\n'
             '1. Open terminal in project root\n'
-            '2. Run: uvicorn backend.main:app --reload --host 0.0.0.0\n'
+            '2. Run: ./start_backend.sh\n'
+            '   (or: uvicorn backend.main:app --reload --host 0.0.0.0)\n'
             '3. Make sure it\'s running on port 8000';
-      } else {
-        errorMessage = 'Error: $e';
+      }
+      // Handle "No face detected" errors
+      else if (errorStr.contains('No face detected')) {
+        errorTitle = 'No Face Detected';
+        errorIcon = Icons.face;
+        errorMessage = 'Could not detect a face in one of the images.\n\n'
+            'Please make sure:\n'
+            '• The image shows a clear, front-facing face\n'
+            '• The face is not too small or too large\n'
+            '• The image has good lighting\n'
+            '• The face is not at an extreme angle\n'
+            '• Try using a different image';
+      }
+      // Handle other face recognition errors
+      else if (errorStr.contains('face') || errorStr.contains('Face')) {
+        errorTitle = 'Face Recognition Error';
+        errorMessage = errorStr
+            .replaceAll('Exception: ', '')
+            .replaceAll('Error during face comparison: ', '')
+            .replaceAll('Error: ', '');
+      }
+      // Handle other errors
+      else {
+        // Clean up the error message
+        errorMessage = errorStr
+            .replaceAll('Exception: ', '')
+            .replaceAll('Error: ', '');
+        
+        // If it's a server error, show a cleaner message
+        if (errorStr.contains('Server error:')) {
+          errorTitle = 'Server Error';
+        }
       }
       
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Error'),
+            title: Row(
+              children: [
+                Icon(errorIcon, color: Colors.red),
+                const SizedBox(width: 8),
+                Expanded(child: Text(errorTitle)),
+              ],
+            ),
             content: SingleChildScrollView(
-              child: Text(errorMessage),
+              child: Text(
+                errorMessage,
+                style: const TextStyle(fontSize: 14),
+              ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('OK'),
               ),
-              if (e.toString().contains('SocketException') || 
-                  e.toString().contains('Failed host lookup') ||
-                  e.toString().contains('Connection refused'))
+              if (errorStr.contains('SocketException') || 
+                  errorStr.contains('Failed host lookup') ||
+                  errorStr.contains('Connection refused'))
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
