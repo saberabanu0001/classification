@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from inference import FaceAnalysis
+from backend.inference import FaceAnalysis
 
 
 def parse_args():
