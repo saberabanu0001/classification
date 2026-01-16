@@ -400,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         children: [
                           Text(
-                            'IMAGE 1',
+                            'IMAGE 1(multiple)',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
