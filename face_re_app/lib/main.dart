@@ -882,7 +882,11 @@ class _HomeScreenState extends State<HomeScreen> {
           return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
         }
         
-        final imageSize = snapshot.data!;
+        final originalImageSize = snapshot.data!;
+        final originalTop = (nonNullLocation['top'] as num).toDouble();
+        final originalRight = (nonNullLocation['right'] as num).toDouble();
+        final originalBottom = (nonNullLocation['bottom'] as num).toDouble();
+        final originalLeft = (nonNullLocation['left'] as num).toDouble();
         
         return Container(
           constraints: const BoxConstraints(maxHeight: 300),
@@ -895,24 +899,69 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Stack(
-              children: [
-                // Image
-                Image.file(
-                  nonNullTargetImage,
-                  fit: BoxFit.contain,
-                ),
-                // Bounding box overlay
-                CustomPaint(
-                  size: imageSize,
-                  painter: BoundingBoxPainter(
-                    top: (nonNullLocation['top'] as num).toDouble(),
-                    right: (nonNullLocation['right'] as num).toDouble(),
-                    bottom: (nonNullLocation['bottom'] as num).toDouble(),
-                    left: (nonNullLocation['left'] as num).toDouble(),
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calculate displayed image size (with BoxFit.contain)
+                final maxWidth = constraints.maxWidth;
+                final maxHeight = constraints.maxHeight;
+                
+                final imageAspectRatio = originalImageSize.width / originalImageSize.height;
+                final containerAspectRatio = maxWidth / maxHeight;
+                
+                double displayedWidth;
+                double displayedHeight;
+                double offsetX = 0;
+                double offsetY = 0;
+                
+                if (imageAspectRatio > containerAspectRatio) {
+                  // Image is wider - fit to width
+                  displayedWidth = maxWidth;
+                  displayedHeight = maxWidth / imageAspectRatio;
+                  offsetY = (maxHeight - displayedHeight) / 2;
+                } else {
+                  // Image is taller - fit to height
+                  displayedHeight = maxHeight;
+                  displayedWidth = maxHeight * imageAspectRatio;
+                  offsetX = (maxWidth - displayedWidth) / 2;
+                }
+                
+                // Calculate scale factors
+                final scaleX = displayedWidth / originalImageSize.width;
+                final scaleY = displayedHeight / originalImageSize.height;
+                
+                // Scale bounding box coordinates
+                final scaledTop = originalTop * scaleY + offsetY;
+                final scaledLeft = originalLeft * scaleX + offsetX;
+                final scaledRight = originalRight * scaleX + offsetX;
+                final scaledBottom = originalBottom * scaleY + offsetY;
+                
+                return Stack(
+                  children: [
+                    // Image
+                    Image.file(
+                      nonNullTargetImage,
+                      fit: BoxFit.contain,
+                      width: maxWidth,
+                      height: maxHeight,
+                    ),
+                    // Bounding box overlay
+                    Positioned(
+                      left: scaledLeft,
+                      top: scaledTop,
+                      child: Container(
+                        width: scaledRight - scaledLeft,
+                        height: scaledBottom - scaledTop,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.green,
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );
