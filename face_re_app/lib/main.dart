@@ -947,33 +947,73 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(width: 12),
                 // Cropped matched face (like profile picture)
-                Container(
-                  width: 120,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.green,
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withOpacity(0.5),
-                        blurRadius: 12,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: _CroppedFaceWidget(
-                      imageFile: nonNullTargetImage,
-                      cropTop: originalTop,
-                      cropLeft: originalLeft,
-                      cropBottom: originalBottom,
-                      cropRight: originalRight,
-                    ),
-                  ),
+                // Calculate aspect ratio to maintain face proportions
+                Builder(
+                  builder: (context) {
+                    final faceWidth = originalRight - originalLeft;
+                    final faceHeight = originalBottom - originalTop;
+                    final faceAspectRatio = faceWidth / faceHeight;
+                    
+                    // Container should be square-ish for faces (typical face ratio)
+                    final containerHeight = 200.0;
+                    final containerWidth = (containerHeight * faceAspectRatio).clamp(100.0, 150.0);
+                    
+                    return Stack(
+                      children: [
+                        Container(
+                          width: containerWidth,
+                          height: containerHeight,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.green,
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.green.withOpacity(0.5),
+                                blurRadius: 12,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: _CroppedFaceWidget(
+                              imageFile: nonNullTargetImage,
+                              cropTop: originalTop,
+                              cropLeft: originalLeft,
+                              cropBottom: originalBottom,
+                              cropRight: originalRight,
+                            ),
+                          ),
+                        ),
+                        // Face number badge
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              '#1',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
