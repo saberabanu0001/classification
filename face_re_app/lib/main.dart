@@ -912,42 +912,82 @@ class _HomeScreenState extends State<HomeScreen> {
         final originalBottom = (nonNullLocation['bottom'] as num).toDouble();
         final originalLeft = (nonNullLocation['left'] as num).toDouble();
         
-        // Ultra-simple approach: Use InteractiveViewer to show image
-        // and overlay a simple colored rectangle
+        // Real-world approach: Show full image + cropped matched face side-by-side
+        // This is what apps like "Find My Face" do
         final totalFaces = _matchInfo!['total_faces_image1'] as int? ?? 
                           _matchInfo!['total_faces_image2'] as int? ?? 1;
         
         return Column(
           children: [
-            // Image container with bounding box overlay
-            Container(
-              width: double.infinity,
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: accentColor,
-                  width: 2,
+            // Side-by-side: Full image and cropped face
+            Row(
+              children: [
+                // Full image with simple highlight
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: accentColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        nonNullTargetImage,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: _BoundingBoxImage(
-                  imageFile: nonNullTargetImage,
-                  originalImageSize: originalImageSize,
-                  bboxTop: originalTop,
-                  bboxLeft: originalLeft,
-                  bboxBottom: originalBottom,
-                  bboxRight: originalRight,
+                const SizedBox(width: 12),
+                // Cropped matched face (like profile picture)
+                Container(
+                  width: 120,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.5),
+                        blurRadius: 12,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(9),
+                    child: _CroppedFaceWidget(
+                      imageFile: nonNullTargetImage,
+                      cropTop: originalTop,
+                      cropLeft: originalLeft,
+                      cropBottom: originalBottom,
+                      cropRight: originalRight,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
             const SizedBox(height: 12),
-            // Info badge
+            // Success card
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.15),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.withOpacity(0.2),
+                    Colors.green.withOpacity(0.1),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: Colors.green,
@@ -955,22 +995,43 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.face,
-                    color: Colors.green,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    totalFaces > 1
-                        ? 'Matched: Face #1 of $totalFaces detected faces'
-                        : 'Face matched successfully',
-                    style: const TextStyle(
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
                       color: Colors.green,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Matched Face Found!',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          totalFaces > 1
+                              ? 'Face #1 matched out of $totalFaces detected faces'
+                              : 'Face successfully identified',
+                          style: TextStyle(
+                            color: Colors.green.withOpacity(0.9),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1221,4 +1282,86 @@ class _BoundingBoxImage extends StatelessWidget {
       },
     );
   }
+}
+
+// Simple widget to show cropped face - like a profile picture
+class _CroppedFaceWidget extends StatelessWidget {
+  final File imageFile;
+  final double cropTop;
+  final double cropLeft;
+  final double cropBottom;
+  final double cropRight;
+
+  const _CroppedFaceWidget({
+    required this.imageFile,
+    required this.cropTop,
+    required this.cropLeft,
+    required this.cropBottom,
+    required this.cropRight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ui.Image>(
+      future: _loadAndCropImage(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const Center(
+            child: Icon(Icons.error, color: Colors.red),
+          );
+        }
+        
+        return CustomPaint(
+          size: Size.infinite,
+          painter: _CroppedImagePainter(
+            image: snapshot.data!,
+            cropRect: Rect.fromLTRB(
+              cropLeft,
+              cropTop,
+              cropRight,
+              cropBottom,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<ui.Image> _loadAndCropImage() async {
+    final bytes = await imageFile.readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+}
+
+class _CroppedImagePainter extends CustomPainter {
+  final ui.Image image;
+  final Rect cropRect;
+
+  _CroppedImagePainter({
+    required this.image,
+    required this.cropRect,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw the cropped portion, scaled to fit
+    final srcRect = cropRect;
+    final dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    
+    canvas.drawImageRect(
+      image,
+      srcRect,
+      dstRect,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
