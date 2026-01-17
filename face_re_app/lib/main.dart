@@ -846,9 +846,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildImageWithBoundingBox() {
+    print('🔍 _buildImageWithBoundingBox called');
+    print('🔍 _matchInfo: $_matchInfo');
+    
     // Determine which image has multiple faces
     bool image1HasMultiple = _matchInfo!['multiple_faces_image1'] == true;
     bool image2HasMultiple = _matchInfo!['multiple_faces_image2'] == true;
+    
+    print('🔍 image1HasMultiple: $image1HasMultiple, image2HasMultiple: $image2HasMultiple');
+    print('🔍 image1: $image1, image2: $image2');
     
     // Show the image with multiple faces, or image1 if both have multiple
     File? targetImage;
@@ -858,18 +864,24 @@ class _HomeScreenState extends State<HomeScreen> {
     if (image1HasMultiple && image1 != null) {
       targetImage = image1;
       location = _matchInfo!['face1_location'] as Map<String, dynamic>?;
+      print('🔍 Using image1 with face1_location: $location');
     } else if (image2HasMultiple && image2 != null) {
       targetImage = image2;
       location = _matchInfo!['face2_location'] as Map<String, dynamic>?;
+      print('🔍 Using image2 with face2_location: $location');
     } else {
       // Fallback: show image1 if available
       targetImage = image1;
       location = _matchInfo!['face1_location'] as Map<String, dynamic>?;
+      print('🔍 Fallback: Using image1 with face1_location: $location');
     }
     
     if (targetImage == null || location == null) {
+      print('❌ targetImage or location is null! targetImage: $targetImage, location: $location');
       return const SizedBox.shrink();
     }
+    
+    print('✅ Building bounding box widget');
     
     // Extract to non-nullable variables after null check
     final nonNullTargetImage = targetImage!;
@@ -878,11 +890,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return FutureBuilder<Size>(
       future: _getImageSize(nonNullTargetImage),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⏳ Loading image size...');
           return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
         }
         
+        if (snapshot.hasError) {
+          print('❌ Error loading image: ${snapshot.error}');
+          return const SizedBox(height: 200, child: Center(child: Text('Error loading image')));
+        }
+        
+        if (!snapshot.hasData) {
+          print('❌ No image size data');
+          return const SizedBox(height: 200, child: Center(child: Text('No image data')));
+        }
+        
         final originalImageSize = snapshot.data!;
+        print('✅ Image size loaded: ${originalImageSize.width}x${originalImageSize.height}');
         final originalTop = (nonNullLocation['top'] as num).toDouble();
         final originalRight = (nonNullLocation['right'] as num).toDouble();
         final originalBottom = (nonNullLocation['bottom'] as num).toDouble();
@@ -947,38 +971,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 print('Scaled bbox: top=$scaledTop, left=$scaledLeft, bottom=$scaledBottom, right=$scaledRight');
                 print('Bbox size: ${scaledRight - scaledLeft} x ${scaledBottom - scaledTop}');
                 
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Image - positioned to match our calculations
-                    Positioned(
-                      left: offsetX,
-                      top: offsetY,
-                      child: SizedBox(
-                        width: displayedWidth,
-                        height: displayedHeight,
-                        child: Image.file(
-                          nonNullTargetImage,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                return CustomPaint(
+                  size: Size(containerWidth, containerHeight),
+                  painter: BoundingBoxImagePainter(
+                    imageFile: nonNullTargetImage,
+                    originalImageSize: originalImageSize,
+                    bboxTop: originalTop,
+                    bboxLeft: originalLeft,
+                    bboxBottom: originalBottom,
+                    bboxRight: originalRight,
+                  ),
+                  child: Container(
+                    width: containerWidth,
+                    height: containerHeight,
+                    child: Image.file(
+                      nonNullTargetImage,
+                      fit: BoxFit.contain,
                     ),
-                    // Bounding box overlay
-                    Positioned(
-                      left: scaledLeft,
-                      top: scaledTop,
-                      child: Container(
-                        width: scaledRight - scaledLeft,
-                        height: scaledBottom - scaledTop,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.green,
-                            width: 4,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),
@@ -994,28 +1004,78 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class BoundingBoxPainter extends CustomPainter {
-  final double top;
-  final double right;
-  final double bottom;
-  final double left;
+class BoundingBoxImagePainter extends CustomPainter {
+  final File imageFile;
+  final Size originalImageSize;
+  final double bboxTop;
+  final double bboxLeft;
+  final double bboxBottom;
+  final double bboxRight;
 
-  BoundingBoxPainter({
-    required this.top,
-    required this.right,
-    required this.bottom,
-    required this.left,
+  BoundingBoxImagePainter({
+    required this.imageFile,
+    required this.originalImageSize,
+    required this.bboxTop,
+    required this.bboxLeft,
+    required this.bboxBottom,
+    required this.bboxRight,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Calculate displayed image size (BoxFit.contain logic)
+    final imageAspectRatio = originalImageSize.width / originalImageSize.height;
+    final containerAspectRatio = size.width / size.height;
+    
+    double displayedWidth;
+    double displayedHeight;
+    double offsetX = 0;
+    double offsetY = 0;
+    
+    if (imageAspectRatio > containerAspectRatio) {
+      // Image is wider - fit to width
+      displayedWidth = size.width;
+      displayedHeight = size.width / imageAspectRatio;
+      offsetY = (size.height - displayedHeight) / 2;
+    } else {
+      // Image is taller - fit to height
+      displayedHeight = size.height;
+      displayedWidth = size.height * imageAspectRatio;
+      offsetX = (size.width - displayedWidth) / 2;
+    }
+    
+    // Calculate scale factors
+    final scaleX = displayedWidth / originalImageSize.width;
+    final scaleY = displayedHeight / originalImageSize.height;
+    
+    // Scale bounding box coordinates
+    final scaledTop = bboxTop * scaleY + offsetY;
+    final scaledLeft = bboxLeft * scaleX + offsetX;
+    final scaledRight = bboxRight * scaleX + offsetX;
+    final scaledBottom = bboxBottom * scaleY + offsetY;
+    
+    // Draw bounding box
     final paint = Paint()
       ..color = Colors.green
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    final rect = Rect.fromLTRB(left, top, right, bottom);
+      ..strokeWidth = 4.0;
+    
+    final rect = Rect.fromLTRB(
+      scaledLeft,
+      scaledTop,
+      scaledRight,
+      scaledBottom,
+    );
+    
     canvas.drawRect(rect, paint);
+    
+    // Draw a thicker outer border for visibility
+    final outerPaint = Paint()
+      ..color = Colors.green.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    
+    canvas.drawRect(rect, outerPaint);
   }
 
   @override
