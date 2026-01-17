@@ -912,87 +912,135 @@ class _HomeScreenState extends State<HomeScreen> {
         final originalBottom = (nonNullLocation['bottom'] as num).toDouble();
         final originalLeft = (nonNullLocation['left'] as num).toDouble();
         
-        return Container(
-          width: double.infinity,
-          height: 300,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: accentColor,
-              width: 2,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final containerWidth = constraints.maxWidth;
-                final containerHeight = constraints.maxHeight;
-                
-                // Calculate displayed image size (with BoxFit.contain)
-                final imageAspectRatio = originalImageSize.width / originalImageSize.height;
-                final containerAspectRatio = containerWidth / containerHeight;
-                
-                double displayedWidth;
-                double displayedHeight;
-                double offsetX = 0;
-                double offsetY = 0;
-                
-                if (imageAspectRatio > containerAspectRatio) {
-                  // Image is wider - fit to width
-                  displayedWidth = containerWidth;
-                  displayedHeight = containerWidth / imageAspectRatio;
-                  offsetY = (containerHeight - displayedHeight) / 2;
-                } else {
-                  // Image is taller - fit to height
-                  displayedHeight = containerHeight;
-                  displayedWidth = containerHeight * imageAspectRatio;
-                  offsetX = (containerWidth - displayedWidth) / 2;
-                }
-                
-                // Calculate scale factors
-                final scaleX = displayedWidth / originalImageSize.width;
-                final scaleY = displayedHeight / originalImageSize.height;
-                
-                // Scale bounding box coordinates
-                final scaledTop = originalTop * scaleY + offsetY;
-                final scaledLeft = originalLeft * scaleX + offsetX;
-                final scaledRight = originalRight * scaleX + offsetX;
-                final scaledBottom = originalBottom * scaleY + offsetY;
-                
-                // Debug print
-                print('=== Bounding Box Debug ===');
-                print('Original image: ${originalImageSize.width}x${originalImageSize.height}');
-                print('Original bbox: top=$originalTop, left=$originalLeft, bottom=$originalBottom, right=$originalRight');
-                print('Container: ${containerWidth}x${containerHeight}');
-                print('Displayed size: ${displayedWidth}x${displayedHeight}');
-                print('Scale: $scaleX x $scaleY');
-                print('Offset: $offsetX, $offsetY');
-                print('Scaled bbox: top=$scaledTop, left=$scaledLeft, bottom=$scaledBottom, right=$scaledRight');
-                print('Bbox size: ${scaledRight - scaledLeft} x ${scaledBottom - scaledTop}');
-                
-                return CustomPaint(
-                  size: Size(containerWidth, containerHeight),
-                  painter: BoundingBoxImagePainter(
-                    imageFile: nonNullTargetImage,
-                    originalImageSize: originalImageSize,
-                    bboxTop: originalTop,
-                    bboxLeft: originalLeft,
-                    bboxBottom: originalBottom,
-                    bboxRight: originalRight,
-                  ),
-                  child: Container(
-                    width: containerWidth,
-                    height: containerHeight,
-                    child: Image.file(
+        // Simple approach: Show image with a colored border indicator
+        // and display the matched face number
+        final totalFaces = _matchInfo!['total_faces_image1'] as int? ?? 
+                          _matchInfo!['total_faces_image2'] as int? ?? 1;
+        final matchedFaceNumber = image1HasMultiple ? 1 : 1; // Face #1 was matched
+        
+        return Column(
+          children: [
+            // Full image with indicator
+            Container(
+              width: double.infinity,
+              height: 300,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: accentColor,
+                  width: 2,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Stack(
+                  children: [
+                    // Image
+                    Image.file(
                       nonNullTargetImage,
                       fit: BoxFit.contain,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                    // Green overlay indicator in top-left corner
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Face #$matchedFaceNumber Matched',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Corner indicators showing which face was matched
+                    if (totalFaces > 1) ...[
+                      // Top-left corner indicator
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: CustomPaint(
+                          painter: SimpleBoundingBoxPainter(
+                            imageSize: originalImageSize,
+                            bboxTop: originalTop,
+                            bboxLeft: originalLeft,
+                            bboxBottom: originalBottom,
+                            bboxRight: originalRight,
+                            containerSize: const Size(double.infinity, 300),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Info text
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.green.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      totalFaces > 1
+                          ? 'Matched face #$matchedFaceNumber out of $totalFaces faces detected'
+                          : 'Face matched successfully',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -1004,28 +1052,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class BoundingBoxImagePainter extends CustomPainter {
-  final File imageFile;
-  final Size originalImageSize;
+class SimpleBoundingBoxPainter extends CustomPainter {
+  final Size imageSize;
   final double bboxTop;
   final double bboxLeft;
   final double bboxBottom;
   final double bboxRight;
+  final Size containerSize;
 
-  BoundingBoxImagePainter({
-    required this.imageFile,
-    required this.originalImageSize,
+  SimpleBoundingBoxPainter({
+    required this.imageSize,
     required this.bboxTop,
     required this.bboxLeft,
     required this.bboxBottom,
     required this.bboxRight,
+    required this.containerSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Calculate displayed image size (BoxFit.contain logic)
-    final imageAspectRatio = originalImageSize.width / originalImageSize.height;
-    final containerAspectRatio = size.width / size.height;
+    // Calculate how image is displayed (BoxFit.contain)
+    final imageAspectRatio = imageSize.width / imageSize.height;
+    final containerAspectRatio = containerSize.width / containerSize.height;
     
     double displayedWidth;
     double displayedHeight;
@@ -1033,32 +1081,30 @@ class BoundingBoxImagePainter extends CustomPainter {
     double offsetY = 0;
     
     if (imageAspectRatio > containerAspectRatio) {
-      // Image is wider - fit to width
-      displayedWidth = size.width;
-      displayedHeight = size.width / imageAspectRatio;
-      offsetY = (size.height - displayedHeight) / 2;
+      displayedWidth = containerSize.width;
+      displayedHeight = containerSize.width / imageAspectRatio;
+      offsetY = (containerSize.height - displayedHeight) / 2;
     } else {
-      // Image is taller - fit to height
-      displayedHeight = size.height;
-      displayedWidth = size.height * imageAspectRatio;
-      offsetX = (size.width - displayedWidth) / 2;
+      displayedHeight = containerSize.height;
+      displayedWidth = containerSize.height * imageAspectRatio;
+      offsetX = (containerSize.width - displayedWidth) / 2;
     }
     
-    // Calculate scale factors
-    final scaleX = displayedWidth / originalImageSize.width;
-    final scaleY = displayedHeight / originalImageSize.height;
+    // Scale factors
+    final scaleX = displayedWidth / imageSize.width;
+    final scaleY = displayedHeight / imageSize.height;
     
-    // Scale bounding box coordinates
-    final scaledTop = bboxTop * scaleY + offsetY;
+    // Scale coordinates
     final scaledLeft = bboxLeft * scaleX + offsetX;
+    final scaledTop = bboxTop * scaleY + offsetY;
     final scaledRight = bboxRight * scaleX + offsetX;
     final scaledBottom = bboxBottom * scaleY + offsetY;
     
-    // Draw bounding box
+    // Draw bounding box with green border
     final paint = Paint()
       ..color = Colors.green
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0;
+      ..strokeWidth = 5.0;
     
     final rect = Rect.fromLTRB(
       scaledLeft,
@@ -1067,15 +1113,64 @@ class BoundingBoxImagePainter extends CustomPainter {
       scaledBottom,
     );
     
+    // Draw main border
     canvas.drawRect(rect, paint);
     
-    // Draw a thicker outer border for visibility
-    final outerPaint = Paint()
-      ..color = Colors.green.withOpacity(0.3)
+    // Draw corner markers for better visibility
+    final cornerLength = 20.0;
+    final cornerPaint = Paint()
+      ..color = Colors.green
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      ..strokeWidth = 6.0
+      ..strokeCap = StrokeCap.round;
     
-    canvas.drawRect(rect, outerPaint);
+    // Top-left corner
+    canvas.drawLine(
+      Offset(scaledLeft, scaledTop),
+      Offset(scaledLeft + cornerLength, scaledTop),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scaledLeft, scaledTop),
+      Offset(scaledLeft, scaledTop + cornerLength),
+      cornerPaint,
+    );
+    
+    // Top-right corner
+    canvas.drawLine(
+      Offset(scaledRight, scaledTop),
+      Offset(scaledRight - cornerLength, scaledTop),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scaledRight, scaledTop),
+      Offset(scaledRight, scaledTop + cornerLength),
+      cornerPaint,
+    );
+    
+    // Bottom-left corner
+    canvas.drawLine(
+      Offset(scaledLeft, scaledBottom),
+      Offset(scaledLeft + cornerLength, scaledBottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scaledLeft, scaledBottom),
+      Offset(scaledLeft, scaledBottom - cornerLength),
+      cornerPaint,
+    );
+    
+    // Bottom-right corner
+    canvas.drawLine(
+      Offset(scaledRight, scaledBottom),
+      Offset(scaledRight - cornerLength, scaledBottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(scaledRight, scaledBottom),
+      Offset(scaledRight, scaledBottom - cornerLength),
+      cornerPaint,
+    );
   }
 
   @override
